@@ -16,7 +16,7 @@ provider "aws" {
 # A VPC with public subnets only. The instance gets a public address for
 # egress, and its security group has no ingress rule.
 module "network" {
-  source = "git::https://github.com/Jaws-Platform/terraform-aws-jaws-network.git?ref=v0.1.0"
+  source = "git::https://github.com/jaws-platform/terraform-aws-jaws-network.git?ref=v0.1.0"
 
   name = "acme-chess-engine"
 }

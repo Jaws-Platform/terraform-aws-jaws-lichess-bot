@@ -16,7 +16,7 @@
 
 locals {
   # The repository is named `<prefix>` and everything else `<prefix>-*`, which
-  # is also what the `container/*` policies of Jaws-Platform/jaws-ci/aws are
+  # is also what the `container/*` policies of jaws-platform/jaws-ci/aws are
   # scoped to.
   prefix = "${var.name_root}-${var.project}"
 }
