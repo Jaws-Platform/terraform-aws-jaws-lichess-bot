@@ -1,6 +1,6 @@
 # ecr-repository
 
-Part of [`jaws-platform/jaws-lichess-bot/aws`](https://registry.terraform.io/modules/jaws-platform/jaws-lichess-bot/aws/latest) · [Registry](https://registry.terraform.io/modules/jaws-platform/jaws-lichess-bot/aws/latest/submodules/ecr-repository) · [Source](https://github.com/jaws-platform/terraform-aws-jaws-lichess-bot/tree/main/modules/ecr-repository)
+Part of [`Jaws-Platform/jaws-lichess-bot/aws`](https://registry.terraform.io/modules/Jaws-Platform/jaws-lichess-bot/aws/latest) · [Registry](https://registry.terraform.io/modules/Jaws-Platform/jaws-lichess-bot/aws/latest/submodules/ecr-repository) · [Source](https://github.com/Jaws-Platform/terraform-aws-jaws-lichess-bot/tree/main/modules/ecr-repository)
 
 A private ECR repository for one image, set up for release images:
 
@@ -16,9 +16,9 @@ A private ECR repository for one image, set up for release images:
 - Tagged `Name = <name>` and `Component = <component>`.
 
 The module grants nobody access: that is for the IAM policies of whatever
-pulls and pushes. In the [`jaws-ci`](https://registry.terraform.io/modules/jaws-platform/jaws-ci/aws/latest)
+pulls and pushes. In the [`jaws-ci`](https://registry.terraform.io/modules/Jaws-Platform/jaws-ci/aws/latest)
 family, the `ecr/pull` and `ecr/push` policies of
-[`ci-policies`](https://registry.terraform.io/modules/jaws-platform/jaws-ci/aws/latest/submodules/ci-policies)
+[`ci-policies`](https://registry.terraform.io/modules/Jaws-Platform/jaws-ci/aws/latest/submodules/ci-policies)
 take this module's `arn`, `container/release` pushes to a repository named
 `<name_root>-<project>`, and `foundation/manage` and `container/manage` let a
 CI role create the repository itself.
@@ -27,7 +27,7 @@ CI role create the repository itself.
 
 ```hcl
 module "image" {
-  source  = "jaws-platform/jaws-lichess-bot/aws//modules/ecr-repository"
+  source  = "Jaws-Platform/jaws-lichess-bot/aws//modules/ecr-repository"
   version = "0.1.1" # x-release-please-version
 
   name                       = "acme-chess-engine"
@@ -37,9 +37,9 @@ module "image" {
 ```
 
 Its `url` and `arn` outputs are what
-[`container-instance`](https://registry.terraform.io/modules/jaws-platform/jaws-lichess-bot/aws/latest/submodules/container-instance)
+[`container-instance`](https://registry.terraform.io/modules/Jaws-Platform/jaws-lichess-bot/aws/latest/submodules/container-instance)
 takes as `image_repository_url` and `image_repository_arn`. The
-[root module](https://registry.terraform.io/modules/jaws-platform/jaws-lichess-bot/aws/latest)
+[root module](https://registry.terraform.io/modules/Jaws-Platform/jaws-lichess-bot/aws/latest)
 creates the repository and the instance in one call.
 
 <!-- BEGIN_TF_DOCS -->
@@ -81,7 +81,7 @@ No modules.
 
 | Name | Description |
 | ---- | ----------- |
-| arn | Repository ARN, for IAM policies: `image_repository_arn` of `container-instance`, or `policy_inputs.ecr.repository_arn` of the role modules of `jaws-platform/jaws-ci/aws`. |
+| arn | Repository ARN, for IAM policies: `image_repository_arn` of `container-instance`, or `policy_inputs.ecr.repository_arn` of the role modules of `Jaws-Platform/jaws-ci/aws`. |
 | name | Repository name. |
 | registry\_id | Registry (account) ID the repository belongs to. |
 | url | Repository URL (`<account>.dkr.ecr.<region>.amazonaws.com/<name>`), for `docker push` and `docker pull`. |

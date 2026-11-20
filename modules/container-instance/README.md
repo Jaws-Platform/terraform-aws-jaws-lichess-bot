@@ -1,6 +1,6 @@
 # container-instance
 
-Part of [`jaws-platform/jaws-lichess-bot/aws`](https://registry.terraform.io/modules/jaws-platform/jaws-lichess-bot/aws/latest) · [Registry](https://registry.terraform.io/modules/jaws-platform/jaws-lichess-bot/aws/latest/submodules/container-instance) · [Source](https://github.com/jaws-platform/terraform-aws-jaws-lichess-bot/tree/main/modules/container-instance)
+Part of [`Jaws-Platform/jaws-lichess-bot/aws`](https://registry.terraform.io/modules/Jaws-Platform/jaws-lichess-bot/aws/latest) · [Registry](https://registry.terraform.io/modules/Jaws-Platform/jaws-lichess-bot/aws/latest/submodules/container-instance) · [Source](https://github.com/Jaws-Platform/terraform-aws-jaws-lichess-bot/tree/main/modules/container-instance)
 
 One EC2 instance that runs one image tag from ECR as a long-lived container
 named `app`, with rollouts that never interrupt the work in progress. Built
@@ -72,11 +72,11 @@ aws ssm send-command --document-name AWS-RunShellScript \
 
 A workflow that deploys needs to push the image, write the parameters under
 `bot/`, send `AWS-RunShellScript` to the instance and follow the command, and
-nothing else. In the [`jaws-ci`](https://registry.terraform.io/modules/jaws-platform/jaws-ci/aws/latest)
+nothing else. In the [`jaws-ci`](https://registry.terraform.io/modules/Jaws-Platform/jaws-ci/aws/latest)
 family, the `container/release` policy of
-[`ci-policies`](https://registry.terraform.io/modules/jaws-platform/jaws-ci/aws/latest/submodules/ci-policies)
+[`ci-policies`](https://registry.terraform.io/modules/Jaws-Platform/jaws-ci/aws/latest/submodules/ci-policies)
 grants that to a
-[`ci-release-role`](https://registry.terraform.io/modules/jaws-platform/jaws-ci/aws/latest/submodules/ci-release-role),
+[`ci-release-role`](https://registry.terraform.io/modules/Jaws-Platform/jaws-ci/aws/latest/submodules/ci-release-role),
 for a repository named `<name_root>-<project>` and an instance whose
 `Project` tag is the project.
 
@@ -144,7 +144,7 @@ date. The sync only adds objects: it keeps a local record of what it
 shipped and never uploads a game twice, never runs with `--delete`, and the
 instance role cannot read or delete records. If an object were ever
 overwritten, bucket versioning keeps the old version (30 days by default in
-[`private-bucket`](https://registry.terraform.io/modules/jaws-platform/jaws-foundation/aws/latest/submodules/private-bucket)). Unfinished games and files it cannot place (no game id or
+[`private-bucket`](https://registry.terraform.io/modules/Jaws-Platform/jaws-foundation/aws/latest/submodules/private-bucket)). Unfinished games and files it cannot place (no game id or
 no date) are skipped and counted in the journal. Games that finished in the
 last few minutes before an instance is lost without a clean shutdown are
 not shipped. A game in progress when an instance is replaced is lost; if
@@ -209,7 +209,7 @@ configuration on the instance's encrypted root volume.
 
 ```hcl
 module "bot" {
-  source  = "jaws-platform/jaws-lichess-bot/aws//modules/container-instance"
+  source  = "Jaws-Platform/jaws-lichess-bot/aws//modules/container-instance"
   version = "0.1.1" # x-release-please-version
 
   name_root            = "acme"
@@ -233,10 +233,10 @@ module "bot" {
 }
 ```
 
-`module.image` is an [`ecr-repository`](https://registry.terraform.io/modules/jaws-platform/jaws-lichess-bot/aws/latest/submodules/ecr-repository),
-`module.network` a [`vpc`](https://registry.terraform.io/modules/jaws-platform/jaws-network/aws/latest/submodules/vpc)
-and `module.records` a [`private-bucket`](https://registry.terraform.io/modules/jaws-platform/jaws-foundation/aws/latest/submodules/private-bucket).
-The [root module](https://registry.terraform.io/modules/jaws-platform/jaws-lichess-bot/aws/latest)
+`module.image` is an [`ecr-repository`](https://registry.terraform.io/modules/Jaws-Platform/jaws-lichess-bot/aws/latest/submodules/ecr-repository),
+`module.network` a [`vpc`](https://registry.terraform.io/modules/Jaws-Platform/jaws-network/aws/latest/submodules/vpc)
+and `module.records` a [`private-bucket`](https://registry.terraform.io/modules/Jaws-Platform/jaws-foundation/aws/latest/submodules/private-bucket).
+The [root module](https://registry.terraform.io/modules/Jaws-Platform/jaws-lichess-bot/aws/latest)
 creates the repository and the instance in one call, with the names derived
 from `name_root` and `project`.
 
@@ -287,11 +287,11 @@ No modules.
 | ---- | ----------- | ---- | ------- | :------: |
 | image\_repository\_arn | ARN of the same ECR repository (output `arn` of `ecr-repository`), which the instance may pull from. | `string` | n/a | yes |
 | image\_repository\_url | URL of the ECR repository the image tags come from (output `url` of `ecr-repository`). | `string` | n/a | yes |
-| name | Name of the instance, its role, instance profile and security group, in kebab-case, for example `acme-chess-engine-bot`. Start it with `<name_root>-<project>-` so the `container/*` policies of `jaws-platform/jaws-ci/aws` can manage it. | `string` | n/a | yes |
+| name | Name of the instance, its role, instance profile and security group, in kebab-case, for example `acme-chess-engine-bot`. Start it with `<name_root>-<project>-` so the `container/*` policies of `Jaws-Platform/jaws-ci/aws` can manage it. | `string` | n/a | yes |
 | name\_root | Prefix of parameter and log group paths, in kebab-case: usually the organisation, for example `acme`. | `string` | n/a | yes |
 | project | Project in kebab-case, for example `chess-engine`. Parameters live under `/<name_root>/<project>/bot/` and logs in `/<name_root>/<project>/bot`. | `string` | n/a | yes |
-| subnet\_id | Public subnet of the instance, for example an element of output `public_subnet_ids` of `jaws-platform/jaws-network/aws`. The instance gets a public IPv4 address for egress. | `string` | n/a | yes |
-| vpc\_id | VPC of the security group, for example output `vpc_id` of `jaws-platform/jaws-network/aws`. | `string` | n/a | yes |
+| subnet\_id | Public subnet of the instance, for example an element of output `public_subnet_ids` of `Jaws-Platform/jaws-network/aws`. The instance gets a public IPv4 address for egress. | `string` | n/a | yes |
+| vpc\_id | VPC of the security group, for example output `vpc_id` of `Jaws-Platform/jaws-network/aws`. | `string` | n/a | yes |
 | ami\_id | Image of the instance. Pin it (for example to the current value of `/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-<architecture>`) so the instance is replaced only when you change the pin. `null` follows the latest Amazon Linux 2023 image, which replaces the instance whenever Amazon publishes one. The image must match `architecture`. | `string` | `null` | no |
 | architecture | CPU architecture of the AMI: `x86_64` or `arm64`. The image must be built for the same one. | `string` | `"x86_64"` | no |
 | bot\_name | Name of the account the container plays as (for example the Lichess bot user), recorded in every game record's sidecar. | `string` | `""` | no |
@@ -302,7 +302,7 @@ No modules.
 | health\_seconds | How long a new container has to prove it is healthy before it is rolled back. | `number` | `90` | no |
 | instance\_type | EC2 instance type. Must match `architecture` (t3 for x86\_64, t4g for arm64). | `string` | `"t3.micro"` | no |
 | log\_retention\_days | Retention of the container's CloudWatch log group, in days. | `number` | `30` | no |
-| records\_bucket\_name | Bucket that finished game records are shipped to, for example output `name` of `jaws-platform/jaws-foundation/aws//modules/private-bucket`. `null` disables the records sync. | `string` | `null` | no |
+| records\_bucket\_name | Bucket that finished game records are shipped to, for example output `name` of `Jaws-Platform/jaws-foundation/aws//modules/private-bucket`. `null` disables the records sync. | `string` | `null` | no |
 | records\_container\_path | Absolute path inside the container where it writes one `.pgn` file per game. Required when `records_bucket_name` is set; the host directory mounted there is per image tag. | `string` | `null` | no |
 | records\_prefix | Key prefix in the records bucket. Below it the layout is fixed: `pgn/schema=1/engine=<tag>/date=<YYYY-MM-DD>/<game_id>.pgn` and the matching `meta/.../<game_id>.json` sidecar. | `string` | `"records/"` | no |
 | root\_volume\_gb | Size of the gp3 root volume in GB. It holds Docker images and the game records until they are shipped. | `number` | `16` | no |

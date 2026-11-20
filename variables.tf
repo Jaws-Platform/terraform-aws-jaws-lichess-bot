@@ -4,7 +4,7 @@ variable "name_root" {
 }
 
 variable "project" {
-  description = "Project in kebab-case, for example `chess-engine`. The policies of `jaws-platform/jaws-ci/aws` recognise the instance by a `Project` tag with this value, so give the provider's `default_tags` one if a role from that family deploys to it."
+  description = "Project in kebab-case, for example `chess-engine`. The policies of `Jaws-Platform/jaws-ci/aws` recognise the instance by a `Project` tag with this value, so give the provider's `default_tags` one if a role from that family deploys to it."
   type        = string
 
   validation {
@@ -14,12 +14,12 @@ variable "project" {
 }
 
 variable "vpc_id" {
-  description = "VPC of the instance's security group, for example output `vpc_id` of `jaws-platform/jaws-network/aws`."
+  description = "VPC of the instance's security group, for example output `vpc_id` of `Jaws-Platform/jaws-network/aws`."
   type        = string
 }
 
 variable "subnet_id" {
-  description = "Public subnet of the instance, for example an element of output `public_subnet_ids` of `jaws-platform/jaws-network/aws`. The instance gets a public IPv4 address for egress and has no ingress rule."
+  description = "Public subnet of the instance, for example an element of output `public_subnet_ids` of `Jaws-Platform/jaws-network/aws`. The instance gets a public IPv4 address for egress and has no ingress rule."
   type        = string
 }
 
@@ -81,7 +81,7 @@ variable "bot_name" {
 }
 
 variable "records_bucket_name" {
-  description = "Existing bucket that finished game records are shipped to, for example output `name` of `jaws-platform/jaws-foundation/aws//modules/private-bucket`. The instance may add objects under `records_prefix` and nothing else. Null ships no records."
+  description = "Existing bucket that finished game records are shipped to, for example output `name` of `Jaws-Platform/jaws-foundation/aws//modules/private-bucket`. The instance may add objects under `records_prefix` and nothing else. Null ships no records."
   type        = string
   default     = null
 }
