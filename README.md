@@ -81,7 +81,7 @@ module "network" {
 
 module "bot" {
   source  = "Jaws-Platform/jaws-lichess-bot/aws"
-  version = "0.1.1" # x-release-please-version
+  version = "0.1.2" # x-release-please-version
 
   name_root = "acme"
   project   = "chess-engine"
@@ -110,7 +110,7 @@ module "records" {
 
 module "bot" {
   source  = "Jaws-Platform/jaws-lichess-bot/aws"
-  version = "0.1.1" # x-release-please-version
+  version = "0.1.2" # x-release-please-version
 
   name_root = "acme"
   project   = "chess-engine"
@@ -136,7 +136,7 @@ An image that already lives in another repository, in the same region:
 ```hcl
 module "bot" {
   source  = "Jaws-Platform/jaws-lichess-bot/aws"
-  version = "0.1.1" # x-release-please-version
+  version = "0.1.2" # x-release-please-version
 
   name_root = "acme"
   project   = "chess-engine"
@@ -156,7 +156,7 @@ an image that has nothing to do with a bot:
 ```hcl
 module "image" {
   source  = "Jaws-Platform/jaws-lichess-bot/aws//modules/ecr-repository"
-  version = "0.1.1" # x-release-please-version
+  version = "0.1.2" # x-release-please-version
 
   name = "acme-tools"
 }
