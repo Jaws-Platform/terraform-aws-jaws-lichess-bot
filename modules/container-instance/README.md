@@ -1,0 +1,333 @@
+# container-instance
+
+Part of [`jwallace145/jaws-lichess-bot/aws`](https://registry.terraform.io/modules/jwallace145/jaws-lichess-bot/aws/latest) · [Registry](https://registry.terraform.io/modules/jwallace145/jaws-lichess-bot/aws/latest/submodules/container-instance) · [Source](https://github.com/jwallace145/terraform-aws-jaws-lichess-bot/tree/main/modules/container-instance)
+
+One EC2 instance that runs one image tag from ECR as a long-lived container
+named `app`, with rollouts that never interrupt the work in progress. Built
+for a Lichess bot (a game must finish before the engine is swapped), but
+nothing in it is specific to chess: the image, the secrets, the environment,
+the health check and the stop signal are inputs.
+
+What it creates: the instance (a pinned `ami_id`, or the latest Amazon
+Linux 2023 by public SSM parameter, IMDSv2 only, an encrypted gp3 root volume, a public IPv4 address,
+standard CPU credits), a security group with **no ingress rules**, an
+instance role, a CloudWatch log group `/<name_root>/<project>/bot` and the
+user data that installs Docker, the reconciler and the records sync.
+Operators get a shell through Session Manager; there is no SSH key.
+
+Every resource, including the root volume, carries `Name` and `Component`;
+every other tag comes from the caller's provider `default_tags`.
+
+## How a rollout works
+
+The instance and the release tooling share four SSM parameters under
+`/<name_root>/<project>/bot/`:
+
+| Parameter | Written by | Meaning |
+|---|---|---|
+| `desired-version` | the deploy | The image tag that should run |
+| `running-version` | the reconciler | The tag that is running and healthy |
+| `status` | the reconciler | `ok`, `waiting:<tag>`, `rolling-back:<reason>` or `failed:<reason>` |
+| `last-sync` | the records sync | Time of the last successful upload of game records |
+
+A deploy writes `desired-version` and runs `container-reconcile-async`
+through Run Command, which starts the reconciler as its own systemd unit,
+so a command timeout can never cut a swap in half. Then it follows the
+parameters. The reconciler, `/usr/local/bin/container-reconcile`:
+
+1. takes a lock, so only one reconcile runs at a time; a second one waits
+   for the first and then converges to the newest desired tag;
+2. does nothing if the desired tag is already running (`--restart` forces a
+   swap anyway, for example after rotating a secret);
+3. pulls the new tag and reads the secrets. Both happen before the running
+   container is touched: if either fails, the old version keeps playing and
+   the status says why;
+4. ships finished records, clears the old container's restart policy and
+   sends it **one** stop signal (`SIGINT`); then **waits as long as it
+   takes** for it to exit on its own, writing `waiting:<tag>` every minute.
+   It never kills the container: lichess-bot finishes the game in progress
+   first, so a game is never resigned or aborted by a rollout;
+5. ships the records again; if a newer tag was deployed while it waited,
+   switches to that one; then starts the new tag and gives it
+   `health_seconds` to stay up and log `health_log_pattern`;
+6. on success writes `running-version` and `ok`; if the new tag does not
+   start or does not become healthy, removes it, writes
+   `rolling-back:<reason>`, starts the previous tag again and ends with
+   `failed:<reason>`.
+
+Every run ends with `ok` or `failed:<reason>`, including on an unexpected
+error, so the release tooling never waits on a run that has died. A failed
+progress write (`waiting:<tag>`) never interrupts a swap.
+
+The same reconciler runs once at boot, so a rebooted or replaced instance
+converges to `desired-version` on its own.
+
+Trigger it by hand:
+
+```sh
+aws ssm send-command --document-name AWS-RunShellScript \
+  --targets Key=tag:Project,Values=<project> Key=tag:Component,Values=container-instance \
+  --parameters 'commands=["container-reconcile-async"]'
+```
+
+A workflow that deploys needs to push the image, write the parameters under
+`bot/`, send `AWS-RunShellScript` to the instance and follow the command, and
+nothing else. In the [`jaws-ci`](https://registry.terraform.io/modules/jwallace145/jaws-ci/aws/latest)
+family, the `container/release` policy of
+[`ci-policies`](https://registry.terraform.io/modules/jwallace145/jaws-ci/aws/latest/submodules/ci-policies)
+grants that to a
+[`ci-release-role`](https://registry.terraform.io/modules/jwallace145/jaws-ci/aws/latest/submodules/ci-release-role),
+for a repository named `<name_root>-<project>` and an instance whose
+`Project` tag is the project.
+
+**What replaces the instance.** Changing the image, the instance type or
+anything in the user data (any input of this module except tags) replaces
+the instance and ends the container's current work. Plan before applying and
+apply while the bot is idle.
+
+**Pin the image.** Set `ami_id` to a specific Amazon Linux 2023 image. Then
+the instance changes OS only when you change the pin, in a change whose plan
+shows the replacement. Without a pin, the module follows
+`/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-<architecture>`,
+and every new Amazon release shows up in plans as a replacement. To find the
+current latest image for a new pin:
+
+```sh
+aws ssm get-parameter --name /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64 \
+  --query Parameter.Value --output text
+```
+
+The `ami_id` output reports the image in use. At a clean shutdown (an instance replacement, a stop or a
+reboot) the records are shipped one last time after the container has
+exited, including games that ended seconds before.
+
+## Game records
+
+When `records_bucket_name` is set, the container's `records_container_path`
+is mounted from `/var/lib/container-instance/records/<tag>/`, one directory
+per image tag, so every game is attributed to the engine version that played
+it, even when a swap and a sync overlap. Every 10 minutes, around every
+swap and at shutdown, `/usr/local/bin/container-records-sync` ships each
+**finished** game (a `1-0`, `0-1` or `1/2-1/2` result, untouched for a
+minute) to:
+
+```
+s3://<bucket>/<records_prefix>pgn/schema=1/engine=<tag>/date=<YYYY-MM-DD>/<game_id>.pgn
+s3://<bucket>/<records_prefix>meta/schema=1/engine=<tag>/date=<YYYY-MM-DD>/<game_id>.json
+```
+
+The `.pgn` object is the file the bot wrote, byte for byte (with the
+engine's evaluation comments). The `.json` sidecar is one object per game
+with exactly these keys:
+
+| Key | Type | Value |
+|---|---|---|
+| `schema` | int | `1` |
+| `game_id` | string | The Lichess game id (8 characters) |
+| `engine_version` | string | The image tag that played the game |
+| `image` | string | `<repository url>:<tag>` |
+| `bot` | string | `bot_name` |
+| `instance_id` | string | The EC2 instance |
+| `white`, `black`, `result` | string | From the PGN headers |
+| `utc_date` | string | `YYYY-MM-DD` |
+| `utc_time`, `time_control`, `variant`, `event`, `site` | string or null | From the PGN headers |
+| `white_elo`, `black_elo` | int or null | From the PGN headers |
+| `termination` | string or null | From the PGN headers |
+| `headers` | object | Every PGN header as written |
+| `source_file` | string | The file name on the instance |
+| `sha256` | string | SHA-256 of the `.pgn` object |
+| `synced_at` | string | ISO 8601 UTC time of staging |
+
+The `key=value` path segments are Hive-style partitions, so Athena, Spark
+or DuckDB can read `meta/` as a table partitioned by schema, engine and
+date. The sync only adds objects: it keeps a local record of what it
+shipped and never uploads a game twice, never runs with `--delete`, and the
+instance role cannot read or delete records. If an object were ever
+overwritten, bucket versioning keeps the old version (30 days by default in
+[`private-bucket`](https://registry.terraform.io/modules/jwallace145/jaws-foundation/aws/latest/submodules/private-bucket)). Unfinished games and files it cannot place (no game id or
+no date) are skipped and counted in the journal. Games that finished in the
+last few minutes before an instance is lost without a clean shutdown are
+not shipped. A game in progress when an instance is replaced is lost; if
+lichess-bot resumes it in a new container, the finished game is filed
+under the new container's tag, which played its last moves. Any change to the layout or
+the sidecar keys is a new `schema=` value, never an edit of `schema=1`.
+
+## Running hours
+
+`schedule` runs the instance only part of the day, in UTC, with EventBridge
+Scheduler and no Lambda. Without it the instance runs all the time.
+
+```hcl
+schedule = { days = "daily", start = "08:00", stop = "20:00" } # daily | weekdays | weekends
+```
+
+| Schedule | When | What it does |
+|---|---|---|
+| `<name>-start` | `start` | `ec2:StartInstances`. At boot the reconciler starts the desired tag. |
+| `<name>-drain` | `stop` | Run Command: `container-reconcile --drain`. The container gets the one stop signal a swap sends (a bot stops taking challenges and finishes its game), its records are shipped and the instance powers off. `instance_initiated_shutdown_behavior` is `stop`, so the instance and its disk stay. |
+| `<name>-stop` | `stop` + `drain_minutes` (default 60) | `ec2:StopInstances`, in case the drain is still waiting or never ran. A game still in progress then is lost. |
+
+All three run as `<name>-scheduler`, which may start and stop this one
+instance and send it `AWS-RunShellScript`, nothing else. A drain sets the
+`status` parameter to `stopped`; the next boot sets it back to `ok`.
+
+The schedule is kept regular on purpose. `days` is `daily`, `weekdays`
+(Monday to Friday) or `weekends`; `start` and `stop` are on a quarter hour and
+on the same day, so a window never crosses midnight; the window is 4 to 20
+hours, so the instance is up and down at least 4 hours at a time; and the hard
+stop must fall before midnight. Anything else fails the plan.
+
+Things to know:
+
+- **A deploy while the instance is stopped** cannot run Run Command on it.
+  The desired tag is in the parameter, and the reconciler at the next start
+  converges to it.
+- **A start outside the window** (by hand, to test) lasts until the next drain,
+  which can be most of a day later. Drain it the way the schedule does with
+  `aws ssm send-command --document-name AWS-RunShellScript --instance-ids <id>
+  --parameters 'commands=["/usr/local/bin/container-reconcile-async --drain"]'`.
+- **Each start gets a new public IP.** The instance has no ingress, so nothing
+  depends on it.
+- **A new version of this module that changes the on-instance scripts replaces
+  the instance** once, like any change to the user data. Read the plan before
+  upgrading.
+
+## Access
+
+```sh
+aws ssm start-session --target <instance_id>
+sudo journalctl -u 'container-reconcile*' -u container-records-sync
+sudo docker logs app
+cat /etc/container-instance/config.env   # no secret values: those are read at container start
+```
+
+Secret values reach the container through an env file that is deleted
+right after `docker run`; Docker keeps them in the container's
+configuration on the instance's encrypted root volume.
+
+## Usage
+
+```hcl
+module "bot" {
+  source  = "jwallace145/jaws-lichess-bot/aws//modules/container-instance"
+  version = "0.1.0" # x-release-please-version
+
+  name_root            = "acme"
+  name                 = "acme-chess-engine-bot"
+  project              = "chess-engine"
+  image_repository_url = module.image.url
+  image_repository_arn = module.image.arn
+  vpc_id               = module.network.vpc_id
+  subnet_id            = module.network.public_subnet_ids[0]
+  ami_id               = "ami-0123456789abcdef0" # pinned AL2023; change deliberately
+
+  secret_parameters      = { LICHESS_TOKEN = "/acme/chess-engine/lichess-token" }
+  container_environment  = { ENGINE_HASH_MB = "128" }
+  bot_name               = "chess-engine-bot"
+  records_bucket_name    = module.records.name
+  records_container_path = "/opt/lichess-bot/game_records"
+  health_log_pattern     = "awaiting challenges"
+
+  # Optional: run 08:00-20:00 UTC every day instead of all the time.
+  schedule = { days = "daily", start = "08:00", stop = "20:00" }
+}
+```
+
+`module.image` is an [`ecr-repository`](https://registry.terraform.io/modules/jwallace145/jaws-lichess-bot/aws/latest/submodules/ecr-repository),
+`module.network` a [`vpc`](https://registry.terraform.io/modules/jwallace145/jaws-network/aws/latest/submodules/vpc)
+and `module.records` a [`private-bucket`](https://registry.terraform.io/modules/jwallace145/jaws-foundation/aws/latest/submodules/private-bucket).
+The [root module](https://registry.terraform.io/modules/jwallace145/jaws-lichess-bot/aws/latest)
+creates the repository and the instance in one call, with the names derived
+from `name_root` and `project`.
+
+The instance runs nothing until a deploy first writes `desired-version`.
+
+<!-- BEGIN_TF_DOCS -->
+## Requirements
+
+| Name | Version |
+| ---- | ------- |
+| terraform | >= 1.11 |
+| aws | ~> 6.0 |
+
+## Providers
+
+| Name | Version |
+| ---- | ------- |
+| aws | ~> 6.0 |
+
+## Modules
+
+No modules.
+
+## Resources
+
+| Name | Type |
+| ---- | ---- |
+| [aws_cloudwatch_log_group.this](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/cloudwatch_log_group) | resource |
+| [aws_iam_instance_profile.this](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_instance_profile) | resource |
+| [aws_iam_role.scheduler](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role) | resource |
+| [aws_iam_role.this](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role) | resource |
+| [aws_iam_role_policy.scheduler](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role_policy) | resource |
+| [aws_iam_role_policy.this](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role_policy) | resource |
+| [aws_iam_role_policy_attachment.ssm](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role_policy_attachment) | resource |
+| [aws_instance.this](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/instance) | resource |
+| [aws_scheduler_schedule.drain](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/scheduler_schedule) | resource |
+| [aws_scheduler_schedule.start](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/scheduler_schedule) | resource |
+| [aws_scheduler_schedule.stop](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/scheduler_schedule) | resource |
+| [aws_security_group.this](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/security_group) | resource |
+| [aws_vpc_security_group_egress_rule.all_ipv4](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/vpc_security_group_egress_rule) | resource |
+| [aws_caller_identity.current](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/caller_identity) | data source |
+| [aws_region.current](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/region) | data source |
+| [aws_ssm_parameter.ami](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/ssm_parameter) | data source |
+
+## Inputs
+
+| Name | Description | Type | Default | Required |
+| ---- | ----------- | ---- | ------- | :------: |
+| image\_repository\_arn | ARN of the same ECR repository (output `arn` of `ecr-repository`), which the instance may pull from. | `string` | n/a | yes |
+| image\_repository\_url | URL of the ECR repository the image tags come from (output `url` of `ecr-repository`). | `string` | n/a | yes |
+| name | Name of the instance, its role, instance profile and security group, in kebab-case, for example `acme-chess-engine-bot`. Start it with `<name_root>-<project>-` so the `container/*` policies of `jwallace145/jaws-ci/aws` can manage it. | `string` | n/a | yes |
+| name\_root | Prefix of parameter and log group paths, in kebab-case: usually the organisation, for example `acme`. | `string` | n/a | yes |
+| project | Project in kebab-case, for example `chess-engine`. Parameters live under `/<name_root>/<project>/bot/` and logs in `/<name_root>/<project>/bot`. | `string` | n/a | yes |
+| subnet\_id | Public subnet of the instance, for example an element of output `public_subnet_ids` of `jwallace145/jaws-network/aws`. The instance gets a public IPv4 address for egress. | `string` | n/a | yes |
+| vpc\_id | VPC of the security group, for example output `vpc_id` of `jwallace145/jaws-network/aws`. | `string` | n/a | yes |
+| ami\_id | Image of the instance. Pin it (for example to the current value of `/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-<architecture>`) so the instance is replaced only when you change the pin. `null` follows the latest Amazon Linux 2023 image, which replaces the instance whenever Amazon publishes one. The image must match `architecture`. | `string` | `null` | no |
+| architecture | CPU architecture of the AMI: `x86_64` or `arm64`. The image must be built for the same one. | `string` | `"x86_64"` | no |
+| bot\_name | Name of the account the container plays as (for example the Lichess bot user), recorded in every game record's sidecar. | `string` | `""` | no |
+| component | Value of the `Component` tag on every resource. A deploy can find the instance by its `Project` tag and this one. | `string` | `"container-instance"` | no |
+| container\_environment | Plain environment variables for the container. Values must not contain spaces. | `map(string)` | `{}` | no |
+| drain\_minutes | With a `schedule`: how long after `stop` the instance is stopped regardless, if the container has not finished by then (a game still in progress is lost). | `number` | `60` | no |
+| health\_log\_pattern | Text the new container must log within `health_seconds` to count as healthy, for example `awaiting challenges`. Empty: it only has to stay up. | `string` | `""` | no |
+| health\_seconds | How long a new container has to prove it is healthy before it is rolled back. | `number` | `90` | no |
+| instance\_type | EC2 instance type. Must match `architecture` (t3 for x86\_64, t4g for arm64). | `string` | `"t3.micro"` | no |
+| log\_retention\_days | Retention of the container's CloudWatch log group, in days. | `number` | `30` | no |
+| records\_bucket\_name | Bucket that finished game records are shipped to, for example output `name` of `jwallace145/jaws-foundation/aws//modules/private-bucket`. `null` disables the records sync. | `string` | `null` | no |
+| records\_container\_path | Absolute path inside the container where it writes one `.pgn` file per game. Required when `records_bucket_name` is set; the host directory mounted there is per image tag. | `string` | `null` | no |
+| records\_prefix | Key prefix in the records bucket. Below it the layout is fixed: `pgn/schema=1/engine=<tag>/date=<YYYY-MM-DD>/<game_id>.pgn` and the matching `meta/.../<game_id>.json` sidecar. | `string` | `"records/"` | no |
+| root\_volume\_gb | Size of the gp3 root volume in GB. It holds Docker images and the game records until they are shipped. | `number` | `16` | no |
+| schedule | When the instance runs, in UTC; null runs it all the time. `days` is `daily`,<br/>`weekdays` (Monday to Friday) or `weekends`; `start` and `stop` are `HH:MM` on a<br/>quarter hour, on the same day. At `start` the instance is started; at `stop` the<br/>container is asked to finish (a bot ends its game) and the instance powers off;<br/>`drain_minutes` later it is stopped regardless. The window is 4 to 20 hours, so<br/>the instance is up and down at least 4 hours each, and `stop` plus<br/>`drain_minutes` falls on the same day. | <pre>object({<br/>    days  = string<br/>    start = string<br/>    stop  = string<br/>  })</pre> | `null` | no |
+| secret\_parameters | Environment variables the container gets from SecureString parameters: variable name to parameter name, for example `{ LICHESS_TOKEN = "/acme/chess-engine/lichess-token" }`. The parameters are created out of band, never by Terraform; the instance may read exactly these. | `map(string)` | `{}` | no |
+| stop\_poll\_seconds | How often the reconciler checks whether the stopping container has exited. | `number` | `15` | no |
+| stop\_signal | Signal sent once to the running container to ask it to finish and exit. It is never followed by a kill. | `string` | `"SIGINT"` | no |
+
+## Outputs
+
+| Name | Description |
+| ---- | ----------- |
+| ami\_id | Image the instance runs: the pinned `ami_id`, or the latest Amazon Linux 2023 image when nothing is pinned. |
+| instance\_arn | ARN of the instance. |
+| instance\_id | ID of the instance, for Session Manager (`aws ssm start-session --target`) and Run Command. |
+| log\_group\_arn | ARN of the log group. |
+| log\_group\_name | CloudWatch log group the container logs to. |
+| parameter\_names | The parameters the release tooling and the reconciler share: `desired_version` (written by a deploy), `running_version` and `status` (written by the reconciler), `last_sync` (written by the records sync). |
+| parameter\_prefix | SSM path of the bot's parameters: `/<name_root>/<project>/bot`. |
+| public\_ip | Public IPv4 address of the instance (egress only; nothing listens). |
+| reconciler\_script | Internal: the installed reconciler script text, for tests. |
+| records\_sync\_script | Internal: the installed records sync script text, for tests. |
+| records\_uri | S3 URI the game records are shipped under, or null without a records bucket. |
+| role\_arn | ARN of the instance role. |
+| role\_name | Name of the instance role. |
+| schedule | With a `schedule`: the names of its start, drain and stop schedules (EventBridge Scheduler, default group) and the UTC cron expression of each. Null without one. |
+| security\_group\_id | ID of the egress-only security group. |
+<!-- END_TF_DOCS -->

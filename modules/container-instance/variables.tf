@@ -1,0 +1,300 @@
+variable "name" {
+  description = "Name of the instance, its role, instance profile and security group, in kebab-case, for example `acme-chess-engine-bot`. Start it with `<name_root>-<project>-` so the `container/*` policies of `jwallace145/jaws-ci/aws` can manage it."
+  type        = string
+
+  validation {
+    condition     = can(regex("^[a-z0-9]+(-[a-z0-9]+)*$", var.name)) && length(var.name) <= 48
+    error_message = "name must be kebab-case: lowercase letters, digits and single hyphens, at most 48 characters."
+  }
+}
+
+variable "project" {
+  description = "Project in kebab-case, for example `chess-engine`. Parameters live under `/<name_root>/<project>/bot/` and logs in `/<name_root>/<project>/bot`."
+  type        = string
+
+  validation {
+    condition     = can(regex("^[a-z0-9]+(-[a-z0-9]+)*$", var.project))
+    error_message = "project must be kebab-case: lowercase letters, digits and single hyphens."
+  }
+}
+
+variable "name_root" {
+  description = "Prefix of parameter and log group paths, in kebab-case: usually the organisation, for example `acme`."
+  type        = string
+
+  validation {
+    condition     = can(regex("^[a-z0-9]+(-[a-z0-9]+)*$", var.name_root))
+    error_message = "name_root must be kebab-case: lowercase letters, digits and single hyphens."
+  }
+}
+
+variable "image_repository_url" {
+  description = "URL of the ECR repository the image tags come from (output `url` of `ecr-repository`)."
+  type        = string
+
+  validation {
+    condition     = can(regex("^[0-9]{12}\\.dkr\\.ecr\\.[a-z0-9-]+\\.amazonaws\\.com/[a-z0-9._/-]+$", var.image_repository_url))
+    error_message = "image_repository_url must be an ECR repository URL like `123456789012.dkr.ecr.us-east-1.amazonaws.com/name`."
+  }
+}
+
+variable "image_repository_arn" {
+  description = "ARN of the same ECR repository (output `arn` of `ecr-repository`), which the instance may pull from."
+  type        = string
+
+  validation {
+    condition     = can(regex("^arn:aws:ecr:[a-z0-9-]+:[0-9]{12}:repository/[a-z0-9._/-]+$", var.image_repository_arn))
+    error_message = "image_repository_arn must be an ECR repository ARN like `arn:aws:ecr:us-east-1:123456789012:repository/name`."
+  }
+}
+
+variable "instance_type" {
+  description = "EC2 instance type. Must match `architecture` (t3 for x86_64, t4g for arm64)."
+  type        = string
+  default     = "t3.micro"
+
+  validation {
+    condition     = can(regex("^[a-z0-9]+\\.[a-z0-9]+$", var.instance_type))
+    error_message = "instance_type must look like `t3.micro`."
+  }
+}
+
+variable "ami_id" {
+  description = "Image of the instance. Pin it (for example to the current value of `/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-<architecture>`) so the instance is replaced only when you change the pin. `null` follows the latest Amazon Linux 2023 image, which replaces the instance whenever Amazon publishes one. The image must match `architecture`."
+  type        = string
+  default     = null
+
+  validation {
+    condition     = var.ami_id == null || can(regex("^ami-[0-9a-f]{8,17}$", var.ami_id))
+    error_message = "ami_id must be an AMI ID like ami-0123456789abcdef0, or null."
+  }
+}
+
+variable "architecture" {
+  description = "CPU architecture of the AMI: `x86_64` or `arm64`. The image must be built for the same one."
+  type        = string
+  default     = "x86_64"
+
+  validation {
+    condition     = contains(["x86_64", "arm64"], var.architecture)
+    error_message = "architecture must be x86_64 or arm64."
+  }
+}
+
+variable "vpc_id" {
+  description = "VPC of the security group, for example output `vpc_id` of `jwallace145/jaws-network/aws`."
+  type        = string
+
+  validation {
+    condition     = can(regex("^vpc-[0-9a-f]+$", var.vpc_id))
+    error_message = "vpc_id must be a VPC ID like `vpc-0123abcd`."
+  }
+}
+
+variable "subnet_id" {
+  description = "Public subnet of the instance, for example an element of output `public_subnet_ids` of `jwallace145/jaws-network/aws`. The instance gets a public IPv4 address for egress."
+  type        = string
+
+  validation {
+    condition     = can(regex("^subnet-[0-9a-f]+$", var.subnet_id))
+    error_message = "subnet_id must be a subnet ID like `subnet-0123abcd`."
+  }
+}
+
+variable "secret_parameters" {
+  description = "Environment variables the container gets from SecureString parameters: variable name to parameter name, for example `{ LICHESS_TOKEN = \"/acme/chess-engine/lichess-token\" }`. The parameters are created out of band, never by Terraform; the instance may read exactly these."
+  type        = map(string)
+  default     = {}
+
+  validation {
+    condition     = alltrue([for k in keys(var.secret_parameters) : can(regex("^[A-Z][A-Z0-9_]*$", k))])
+    error_message = "every secret_parameters key must be an environment variable name like `LICHESS_TOKEN`."
+  }
+
+  validation {
+    condition = alltrue([
+      for v in values(var.secret_parameters) :
+      startswith(v, "/${var.name_root}/${var.project}/") && !startswith(v, "/${var.name_root}/${var.project}/bot/") && can(regex("^(/[A-Za-z0-9_.-]+)+$", v))
+    ])
+    error_message = "every secret parameter must live under /<name_root>/<project>/ and outside /<name_root>/<project>/bot/ (which the release role can write)."
+  }
+}
+
+variable "container_environment" {
+  description = "Plain environment variables for the container. Values must not contain spaces."
+  type        = map(string)
+  default     = {}
+
+  validation {
+    condition = alltrue([
+      for k, v in var.container_environment : can(regex("^[A-Z][A-Z0-9_]*$", k)) && can(regex("^[^\\s'\"]*$", v))
+    ])
+    error_message = "container_environment keys must be environment variable names and values must not contain whitespace or quotes."
+  }
+}
+
+variable "bot_name" {
+  description = "Name of the account the container plays as (for example the Lichess bot user), recorded in every game record's sidecar."
+  type        = string
+  default     = ""
+}
+
+variable "records_bucket_name" {
+  description = "Bucket that finished game records are shipped to, for example output `name` of `jwallace145/jaws-foundation/aws//modules/private-bucket`. `null` disables the records sync."
+  type        = string
+  default     = null
+}
+
+variable "records_prefix" {
+  description = "Key prefix in the records bucket. Below it the layout is fixed: `pgn/schema=1/engine=<tag>/date=<YYYY-MM-DD>/<game_id>.pgn` and the matching `meta/.../<game_id>.json` sidecar."
+  type        = string
+  default     = "records/"
+
+  validation {
+    condition     = can(regex("^([a-z0-9][a-z0-9-]*/)+$", var.records_prefix))
+    error_message = "records_prefix must be one or more lowercase path segments ending in `/`, for example `records/`."
+  }
+}
+
+variable "records_container_path" {
+  description = "Absolute path inside the container where it writes one `.pgn` file per game. Required when `records_bucket_name` is set; the host directory mounted there is per image tag."
+  type        = string
+  default     = null
+
+  validation {
+    condition     = var.records_bucket_name == null || (var.records_container_path != null && can(regex("^/[A-Za-z0-9_./-]+$", coalesce(var.records_container_path, "-"))))
+    error_message = "records_container_path must be an absolute path when records_bucket_name is set."
+  }
+}
+
+variable "log_retention_days" {
+  description = "Retention of the container's CloudWatch log group, in days."
+  type        = number
+  default     = 30
+
+  validation {
+    condition     = contains([1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365, 400, 545, 731, 1096, 1827, 2192, 2557, 2922, 3288, 3653], var.log_retention_days)
+    error_message = "log_retention_days must be one of CloudWatch's allowed values: 1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365, 400, 545, 731, 1096, 1827, 2192, 2557, 2922, 3288, 3653."
+  }
+}
+
+variable "health_log_pattern" {
+  description = "Text the new container must log within `health_seconds` to count as healthy, for example `awaiting challenges`. Empty: it only has to stay up."
+  type        = string
+  default     = ""
+}
+
+variable "health_seconds" {
+  description = "How long a new container has to prove it is healthy before it is rolled back."
+  type        = number
+  default     = 90
+
+  validation {
+    condition     = var.health_seconds >= 10 && var.health_seconds <= 600 && floor(var.health_seconds) == var.health_seconds
+    error_message = "health_seconds must be an integer from 10 to 600."
+  }
+}
+
+variable "stop_signal" {
+  description = "Signal sent once to the running container to ask it to finish and exit. It is never followed by a kill."
+  type        = string
+  default     = "SIGINT"
+
+  validation {
+    condition     = can(regex("^SIG[A-Z0-9]+$", var.stop_signal)) && var.stop_signal != "SIGKILL"
+    error_message = "stop_signal must be a signal name like SIGINT or SIGTERM, and never SIGKILL."
+  }
+}
+
+variable "stop_poll_seconds" {
+  description = "How often the reconciler checks whether the stopping container has exited."
+  type        = number
+  default     = 15
+
+  validation {
+    condition     = var.stop_poll_seconds >= 1 && var.stop_poll_seconds <= 60 && floor(var.stop_poll_seconds) == var.stop_poll_seconds
+    error_message = "stop_poll_seconds must be an integer from 1 to 60."
+  }
+}
+
+variable "root_volume_gb" {
+  description = "Size of the gp3 root volume in GB. It holds Docker images and the game records until they are shipped."
+  type        = number
+  default     = 16
+
+  validation {
+    condition     = var.root_volume_gb >= 8 && var.root_volume_gb <= 64 && floor(var.root_volume_gb) == var.root_volume_gb
+    error_message = "root_volume_gb must be an integer from 8 to 64."
+  }
+}
+
+variable "component" {
+  description = "Value of the `Component` tag on every resource. A deploy can find the instance by its `Project` tag and this one."
+  type        = string
+  default     = "container-instance"
+
+  validation {
+    condition     = length(var.component) > 0
+    error_message = "component must not be empty."
+  }
+}
+
+variable "schedule" {
+  description = <<-EOT
+    When the instance runs, in UTC; null runs it all the time. `days` is `daily`,
+    `weekdays` (Monday to Friday) or `weekends`; `start` and `stop` are `HH:MM` on a
+    quarter hour, on the same day. At `start` the instance is started; at `stop` the
+    container is asked to finish (a bot ends its game) and the instance powers off;
+    `drain_minutes` later it is stopped regardless. The window is 4 to 20 hours, so
+    the instance is up and down at least 4 hours each, and `stop` plus
+    `drain_minutes` falls on the same day.
+  EOT
+  type = object({
+    days  = string
+    start = string
+    stop  = string
+  })
+  default = null
+
+  validation {
+    condition     = var.schedule == null || contains(["daily", "weekdays", "weekends"], try(var.schedule.days, ""))
+    error_message = "schedule.days must be daily, weekdays or weekends."
+  }
+
+  validation {
+    condition = var.schedule == null || alltrue([
+      for t in [try(var.schedule.start, ""), try(var.schedule.stop, "")] :
+      can(regex("^([01][0-9]|2[0-3]):(00|15|30|45)$", t))
+    ])
+    error_message = "schedule.start and schedule.stop must be HH:MM in UTC on a quarter hour, from 00:00 to 23:45, for example 08:00."
+  }
+
+  validation {
+    condition = var.schedule == null || !can(regex("^([01][0-9]|2[0-3]):(00|15|30|45)$", try(var.schedule.start, ""))) || !can(regex("^([01][0-9]|2[0-3]):(00|15|30|45)$", try(var.schedule.stop, ""))) || (
+      (tonumber(substr(var.schedule.stop, 0, 2)) * 60 + tonumber(substr(var.schedule.stop, 3, 2))) -
+      (tonumber(substr(var.schedule.start, 0, 2)) * 60 + tonumber(substr(var.schedule.start, 3, 2)))
+      ) >= 240 && (
+      (tonumber(substr(var.schedule.stop, 0, 2)) * 60 + tonumber(substr(var.schedule.stop, 3, 2))) -
+      (tonumber(substr(var.schedule.start, 0, 2)) * 60 + tonumber(substr(var.schedule.start, 3, 2)))
+    ) <= 1200
+    error_message = "schedule.stop must be 4 to 20 hours after schedule.start on the same day (no window across midnight), so the instance is up and down at least 4 hours each."
+  }
+
+  validation {
+    condition = var.schedule == null || !can(regex("^([01][0-9]|2[0-3]):(00|15|30|45)$", try(var.schedule.stop, ""))) || (
+      tonumber(substr(var.schedule.stop, 0, 2)) * 60 + tonumber(substr(var.schedule.stop, 3, 2)) + var.drain_minutes
+    ) <= 1439
+    error_message = "schedule.stop plus drain_minutes must fall before midnight UTC, so the hard stop is on the same day as the stop."
+  }
+}
+
+variable "drain_minutes" {
+  description = "With a `schedule`: how long after `stop` the instance is stopped regardless, if the container has not finished by then (a game still in progress is lost)."
+  type        = number
+  default     = 60
+
+  validation {
+    condition     = var.drain_minutes >= 15 && var.drain_minutes <= 120 && floor(var.drain_minutes) == var.drain_minutes
+    error_message = "drain_minutes must be an integer from 15 to 120."
+  }
+}
