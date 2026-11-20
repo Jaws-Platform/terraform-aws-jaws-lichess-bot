@@ -1,5 +1,5 @@
 variable "name" {
-  description = "Name of the instance, its role, instance profile and security group, in kebab-case, for example `acme-chess-engine-bot`. Start it with `<name_root>-<project>-` so the `container/*` policies of `jaws-platform/jaws-ci/aws` can manage it."
+  description = "Name of the instance, its role, instance profile and security group, in kebab-case, for example `acme-chess-engine-bot`. Start it with `<name_root>-<project>-` so the `container/*` policies of `Jaws-Platform/jaws-ci/aws` can manage it."
   type        = string
 
   validation {
@@ -82,7 +82,7 @@ variable "architecture" {
 }
 
 variable "vpc_id" {
-  description = "VPC of the security group, for example output `vpc_id` of `jaws-platform/jaws-network/aws`."
+  description = "VPC of the security group, for example output `vpc_id` of `Jaws-Platform/jaws-network/aws`."
   type        = string
 
   validation {
@@ -92,7 +92,7 @@ variable "vpc_id" {
 }
 
 variable "subnet_id" {
-  description = "Public subnet of the instance, for example an element of output `public_subnet_ids` of `jaws-platform/jaws-network/aws`. The instance gets a public IPv4 address for egress."
+  description = "Public subnet of the instance, for example an element of output `public_subnet_ids` of `Jaws-Platform/jaws-network/aws`. The instance gets a public IPv4 address for egress."
   type        = string
 
   validation {
@@ -140,7 +140,7 @@ variable "bot_name" {
 }
 
 variable "records_bucket_name" {
-  description = "Bucket that finished game records are shipped to, for example output `name` of `jaws-platform/jaws-foundation/aws//modules/private-bucket`. `null` disables the records sync."
+  description = "Bucket that finished game records are shipped to, for example output `name` of `Jaws-Platform/jaws-foundation/aws//modules/private-bucket`. `null` disables the records sync."
   type        = string
   default     = null
 }

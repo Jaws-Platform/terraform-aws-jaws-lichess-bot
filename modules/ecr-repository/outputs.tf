@@ -1,5 +1,5 @@
 output "arn" {
-  description = "Repository ARN, for IAM policies: `image_repository_arn` of `container-instance`, or `policy_inputs.ecr.repository_arn` of the role modules of `jaws-platform/jaws-ci/aws`."
+  description = "Repository ARN, for IAM policies: `image_repository_arn` of `container-instance`, or `policy_inputs.ecr.repository_arn` of the role modules of `Jaws-Platform/jaws-ci/aws`."
   value       = aws_ecr_repository.this.arn
 }
 
