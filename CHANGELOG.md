@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.2](https://github.com/Jaws-Platform/terraform-aws-jaws-lichess-bot/compare/v0.1.1...v0.1.2) (2026-11-20)
+
+
+### Bug Fixes
+
+* name the organization Jaws-Platform in addresses and links ([#10](https://github.com/Jaws-Platform/terraform-aws-jaws-lichess-bot/issues/10)) ([9997833](https://github.com/Jaws-Platform/terraform-aws-jaws-lichess-bot/commit/999783365f58ea573c2e1387c75d603ca52d68f7))
+
 ## [0.1.1](https://github.com/Jaws-Platform/terraform-aws-jaws-lichess-bot/compare/v0.1.0...v0.1.1) (2026-11-20)
 
 
