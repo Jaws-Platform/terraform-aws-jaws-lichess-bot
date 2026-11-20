@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.1](https://github.com/Jaws-Platform/terraform-aws-jaws-lichess-bot/compare/v0.1.0...v0.1.1) (2026-11-20)
+
+
+### Bug Fixes
+
+* move the registry address and links to the Jaws-Platform organization ([#6](https://github.com/Jaws-Platform/terraform-aws-jaws-lichess-bot/issues/6)) ([23e53d8](https://github.com/Jaws-Platform/terraform-aws-jaws-lichess-bot/commit/23e53d866720bd22be634e814ffd0ba6124db3b8))
+* use the lowercase jaws-platform namespace in addresses and links ([#7](https://github.com/Jaws-Platform/terraform-aws-jaws-lichess-bot/issues/7)) ([92b20a8](https://github.com/Jaws-Platform/terraform-aws-jaws-lichess-bot/commit/92b20a8654f4b191b71da280b49958b955f5ba38))
+
 ## 0.1.0 (2026-11-20)
 
 
