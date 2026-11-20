@@ -26,13 +26,13 @@ module "image" {
 }
 
 module "network" {
-  source = "git::https://github.com/jwallace145/terraform-aws-jaws-network.git//modules/vpc?ref=v0.1.0"
+  source = "git::https://github.com/Jaws-Platform/terraform-aws-jaws-network.git//modules/vpc?ref=v0.1.0"
 
   name = "acme-chess-engine"
 }
 
 module "records" {
-  source = "git::https://github.com/jwallace145/terraform-aws-jaws-foundation.git//modules/private-bucket?ref=v0.1.0"
+  source = "git::https://github.com/Jaws-Platform/terraform-aws-jaws-foundation.git//modules/private-bucket?ref=v0.1.0"
 
   name = "acme-chess-engine-records"
 }
