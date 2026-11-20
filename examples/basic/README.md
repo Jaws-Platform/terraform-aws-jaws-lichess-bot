@@ -3,7 +3,7 @@
 The smallest whole deployment:
 
 - a VPC with public subnets only, from
-  [`jaws-network`](https://registry.terraform.io/modules/jwallace145/jaws-network/aws/latest);
+  [`jaws-network`](https://registry.terraform.io/modules/Jaws-Platform/jaws-network/aws/latest);
 - the ECR repository `acme-chess-engine`;
 - the instance `acme-chess-engine-bot`, a `t3.micro` that runs all the time,
   with no ingress rule and no SSH key.
@@ -18,7 +18,7 @@ aws ssm put-parameter --name /acme/chess-engine/lichess-token --type SecureStrin
 
 The instance follows the latest Amazon Linux 2023 image here, so a new
 release of it replaces the instance. Pin `ami_id`, as the
-[`records-and-schedule`](https://github.com/jwallace145/terraform-aws-jaws-lichess-bot/tree/main/examples/records-and-schedule)
+[`records-and-schedule`](https://github.com/Jaws-Platform/terraform-aws-jaws-lichess-bot/tree/main/examples/records-and-schedule)
 example does, before a game matters.
 
 ```sh
@@ -28,21 +28,21 @@ terraform plan
 
 Nothing runs on the instance until the first deploy writes an image tag to
 the `desired_version` parameter: see
-[Deploying a release](https://github.com/jwallace145/terraform-aws-jaws-lichess-bot#deploying-a-release).
+[Deploying a release](https://github.com/Jaws-Platform/terraform-aws-jaws-lichess-bot#deploying-a-release).
 
 In your own configuration, replace the relative `source` with the registry
 address, and the VPC's git source with its registry address:
 
 ```hcl
 module "network" {
-  source  = "jwallace145/jaws-network/aws"
+  source  = "Jaws-Platform/jaws-network/aws"
   version = "~> 0.1"
 
   name = "acme-chess-engine"
 }
 
 module "bot" {
-  source  = "jwallace145/jaws-lichess-bot/aws"
+  source  = "Jaws-Platform/jaws-lichess-bot/aws"
   version = "0.1.0" # x-release-please-version
 
   name_root = "acme"
