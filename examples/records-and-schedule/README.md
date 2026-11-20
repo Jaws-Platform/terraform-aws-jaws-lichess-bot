@@ -7,7 +7,7 @@ A bot set up the way one runs for real:
 - running hours: started at 08:00 UTC every day, asked to finish its game
   and power off at 20:00, and stopped regardless at 21:00;
 - every finished game shipped to a
-  [`private-bucket`](https://registry.terraform.io/modules/Jaws-Platform/jaws-foundation/aws/latest/submodules/private-bucket)
+  [`private-bucket`](https://registry.terraform.io/modules/jaws-platform/jaws-foundation/aws/latest/submodules/private-bucket)
   under `records/`, as a `.pgn` file and a `.json` sidecar;
 - a health check: a new image tag must log `awaiting challenges` within 90
   seconds, or the previous tag is started again;
@@ -28,21 +28,21 @@ address, and the git sources with theirs:
 
 ```hcl
 module "network" {
-  source  = "Jaws-Platform/jaws-network/aws"
+  source  = "jaws-platform/jaws-network/aws"
   version = "~> 0.1"
 
   name = "acme-chess-engine"
 }
 
 module "records" {
-  source  = "Jaws-Platform/jaws-foundation/aws//modules/private-bucket"
+  source  = "jaws-platform/jaws-foundation/aws//modules/private-bucket"
   version = "~> 0.1"
 
   name = "acme-chess-engine-records"
 }
 
 module "bot" {
-  source  = "Jaws-Platform/jaws-lichess-bot/aws"
+  source  = "jaws-platform/jaws-lichess-bot/aws"
   version = "0.1.0" # x-release-please-version
 
   name_root = "acme"

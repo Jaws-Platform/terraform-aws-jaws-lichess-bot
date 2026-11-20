@@ -33,7 +33,7 @@ data "aws_ami" "bot" {
 }
 
 module "network" {
-  source = "git::https://github.com/Jaws-Platform/terraform-aws-jaws-network.git?ref=v0.1.0"
+  source = "git::https://github.com/jaws-platform/terraform-aws-jaws-network.git?ref=v0.1.0"
 
   name = "acme-chess-engine"
 }
@@ -41,7 +41,7 @@ module "network" {
 # A versioned, private bucket that outlives the bot: it is never destroyed
 # with the stack.
 module "records" {
-  source = "git::https://github.com/Jaws-Platform/terraform-aws-jaws-foundation.git//modules/private-bucket?ref=v0.1.0"
+  source = "git::https://github.com/jaws-platform/terraform-aws-jaws-foundation.git//modules/private-bucket?ref=v0.1.0"
 
   name = "acme-chess-engine-records"
 }
