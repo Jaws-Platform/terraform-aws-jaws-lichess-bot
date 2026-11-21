@@ -1,3 +1,5 @@
+[![Jaws: one platform for every project on AWS](https://raw.githubusercontent.com/Jaws-Platform/jaws-branding/main/assets/banner/jaws-readme-banner.png)](https://github.com/Jaws-Platform)
+
 # terraform-aws-jaws-lichess-bot
 
 [![Terraform Registry](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fregistry.terraform.io%2Fv1%2Fmodules%2FJaws-Platform%2Fjaws-lichess-bot%2Faws&query=%24.version&prefix=v&label=registry&logo=terraform&color=7B42BC)](https://registry.terraform.io/modules/Jaws-Platform/jaws-lichess-bot/aws/latest)
@@ -13,7 +15,7 @@ that only makes outbound connections.
 
 It is deliberately small and cheap: one instance, no load balancer, no auto
 scaling and no ingress. It is one of the
-[Jaws](https://github.com/jwallace145/jaws) module families, and has no
+[Jaws](https://github.com/Jaws-Platform/jaws) module families, and has no
 dependency on Jaws: the network, the records bucket and everything else are
 plain inputs.
 
