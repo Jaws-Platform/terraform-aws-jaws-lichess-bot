@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.3](https://github.com/Jaws-Platform/terraform-aws-jaws-lichess-bot/compare/v0.1.2...v0.1.3) (2026-11-22)
+
+
+### Bug Fixes
+
+* **container-instance:** stop replacing a stopped instance over its public ip read-back ([#13](https://github.com/Jaws-Platform/terraform-aws-jaws-lichess-bot/issues/13)) ([ab1e61c](https://github.com/Jaws-Platform/terraform-aws-jaws-lichess-bot/commit/ab1e61c2a1ec387edd25b6857f93ba87169706dd))
+
 ## [0.1.2](https://github.com/Jaws-Platform/terraform-aws-jaws-lichess-bot/compare/v0.1.1...v0.1.2) (2026-11-20)
 
 
