@@ -152,10 +152,25 @@ run "instance_role" {
     condition = (
       aws_iam_role.this.name == "acme-technologies-rusty-chess-bot" &&
       jsondecode(aws_iam_role.this.assume_role_policy).Statement[0].Principal.Service == "ec2.amazonaws.com" &&
-      aws_iam_instance_profile.this.name == "acme-technologies-rusty-chess-bot" &&
-      aws_iam_role_policy_attachment.ssm.policy_arn == "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+      aws_iam_instance_profile.this.name == "acme-technologies-rusty-chess-bot"
     )
-    error_message = "an EC2 role and instance profile named after the instance, with Session Manager core"
+    error_message = "an EC2 role and instance profile named after the instance"
+  }
+
+  assert {
+    condition = jsonencode(sort([for s in jsondecode(aws_iam_role_policy.this.policy).Statement : s if s.Sid == "SystemsManagerAgent"][0].Action)) == jsonencode(sort([
+      "ssm:UpdateInstanceInformation", "ssm:ListInstanceAssociations", "ssm:UpdateInstanceAssociationStatus",
+      "ssm:DescribeAssociation", "ssm:GetDocument", "ssm:DescribeDocument",
+      "ssmmessages:CreateControlChannel", "ssmmessages:CreateDataChannel", "ssmmessages:OpenControlChannel", "ssmmessages:OpenDataChannel",
+      "ec2messages:AcknowledgeMessage", "ec2messages:DeleteMessage", "ec2messages:FailMessage",
+      "ec2messages:GetEndpoint", "ec2messages:GetMessages", "ec2messages:SendReply",
+    ]))
+    error_message = "the SSM Agent may serve Session Manager and Run Command (the deploys) and nothing more"
+  }
+
+  assert {
+    condition     = !anytrue([for s in jsondecode(aws_iam_role_policy.this.policy).Statement : s.Resource == "*" && anytrue([for a in flatten([s.Action]) : startswith(a, "ssm:GetParameter")])])
+    error_message = "the instance can read only its own parameters and secrets, never every parameter in the account (the managed AmazonSSMManagedInstanceCore policy would allow that)"
   }
 
   assert {
@@ -196,8 +211,8 @@ run "instance_role" {
   }
 
   assert {
-    condition     = sort([for s in jsondecode(aws_iam_role_policy.this.policy).Statement : s.Sid if s.Resource == "*"]) == tolist(["GetEcrAuthorizationToken"])
-    error_message = "only the Docker login token may use Resource = *"
+    condition     = sort([for s in jsondecode(aws_iam_role_policy.this.policy).Statement : s.Sid if s.Resource == "*"]) == tolist(["GetEcrAuthorizationToken", "SystemsManagerAgent"])
+    error_message = "only the Docker login token and the SSM Agent's own calls (no resource-level support) may use Resource = *"
   }
 
   assert {
