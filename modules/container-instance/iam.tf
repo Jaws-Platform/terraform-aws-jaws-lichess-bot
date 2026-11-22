@@ -23,6 +23,22 @@ locals {
     Version = "2012-10-17"
     Statement = concat(
       [
+        # The SSM Agent's own calls, for Session Manager (shell access without
+        # SSH) and Run Command (the deploys). Not AmazonSSMManagedInstanceCore:
+        # it also allows ssm:GetParameter on every parameter, so anything on the
+        # instance could read every SecureString in the account.
+        {
+          Sid    = "SystemsManagerAgent"
+          Effect = "Allow"
+          Action = [
+            "ssm:UpdateInstanceInformation", "ssm:ListInstanceAssociations", "ssm:UpdateInstanceAssociationStatus",
+            "ssm:DescribeAssociation", "ssm:GetDocument", "ssm:DescribeDocument",
+            "ssmmessages:CreateControlChannel", "ssmmessages:CreateDataChannel", "ssmmessages:OpenControlChannel", "ssmmessages:OpenDataChannel",
+            "ec2messages:AcknowledgeMessage", "ec2messages:DeleteMessage", "ec2messages:FailMessage",
+            "ec2messages:GetEndpoint", "ec2messages:GetMessages", "ec2messages:SendReply",
+          ]
+          Resource = "*"
+        },
         {
           # Docker login. The action has no resource-level support.
           Sid      = "GetEcrAuthorizationToken"
@@ -97,12 +113,6 @@ resource "aws_iam_role_policy" "this" {
   name   = "${var.name}-instance"
   role   = aws_iam_role.this.id
   policy = jsonencode(local.instance_policy)
-}
-
-# Session Manager (shell access without SSH) and Run Command.
-resource "aws_iam_role_policy_attachment" "ssm" {
-  role       = aws_iam_role.this.name
-  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
 }
 
 resource "aws_iam_instance_profile" "this" {
