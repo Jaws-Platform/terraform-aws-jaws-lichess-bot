@@ -102,4 +102,16 @@ resource "aws_instance" "this" {
 
   # The log group must exist before the first container logs to it.
   depends_on = [aws_cloudwatch_log_group.this, aws_iam_role_policy.this]
+
+  lifecycle {
+    # The AWS provider reads associate_public_ip_address back from whether the
+    # primary network interface has a public IP right now, not from how the
+    # instance was launched. A stopped instance has released its public IP, so
+    # every plan while it is stopped (outside a schedule's running hours, or
+    # after a drain) reads false, and the attribute forces replacement. It is
+    # always true here, set at launch and never changed, so the read-back is
+    # ignored. hashicorp/terraform-provider-aws#47100 is the same read-back
+    # with an Elastic IP.
+    ignore_changes = [associate_public_ip_address]
+  }
 }

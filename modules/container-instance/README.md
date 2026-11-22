@@ -187,7 +187,13 @@ Things to know:
   `aws ssm send-command --document-name AWS-RunShellScript --instance-ids <id>
   --parameters 'commands=["/usr/local/bin/container-reconcile-async --drain"]'`.
 - **Each start gets a new public IP.** The instance has no ingress, so nothing
-  depends on it.
+  depends on it. The `public_ip` output follows it, so a plan after a stop or a
+  start shows that output changing, and no resource.
+- **A stopped instance is not replaced.** While it is stopped it has no public
+  IP, and the AWS provider reads `associate_public_ip_address` back as `false`
+  from that; the attribute would force a replacement on every plan outside the
+  running hours. The module ignores the read-back, since the instance is
+  always launched with a public IP.
 - **A new version of this module that changes the on-instance scripts replaces
   the instance** once, like any change to the user data. Read the plan before
   upgrading.
