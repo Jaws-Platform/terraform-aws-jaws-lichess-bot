@@ -41,6 +41,27 @@ variable "release_tag_prefixes" {
   }
 }
 
+variable "mutable_tags" {
+  description = "Tags that may move from image to image, such as `current` for the build that is live. Every other tag stays immutable, and the lifecycle never expires the image a mutable tag names."
+  type        = list(string)
+  default     = []
+
+  validation {
+    condition     = length(var.mutable_tags) <= 5
+    error_message = "mutable_tags can hold at most 5 tags, ECR's limit on exclusion filters."
+  }
+
+  validation {
+    condition     = alltrue([for t in var.mutable_tags : can(regex("^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$", t))])
+    error_message = "Each mutable tag must be a plain tag of at most 128 characters, starting with a letter, digit or underscore and holding only letters, digits, `_`, `.` and `-`; a wildcard such as `cur*` is not allowed."
+  }
+
+  validation {
+    condition     = alltrue([for t in var.mutable_tags : alltrue([for p in var.release_tag_prefixes : !startswith(t, p)])])
+    error_message = "No mutable tag may start with one of release_tag_prefixes, because release tags never move. Rename the tag or change release_tag_prefixes."
+  }
+}
+
 variable "component" {
   description = "Value of the `Component` tag on the repository."
   type        = string

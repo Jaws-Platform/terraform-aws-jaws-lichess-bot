@@ -5,7 +5,9 @@ Part of [`Jaws-Platform/jaws-lichess-bot/aws`](https://registry.terraform.io/mod
 A private ECR repository for one image, set up for release images:
 
 - `IMMUTABLE` tags: a release tag can never be moved to another image, so
-  the tag a consumer pins is the image it gets.
+  the tag a consumer pins is the image it gets. The exception is the tags in
+  `mutable_tags` (none by default), such as `current` for the build that is
+  live: they may move, and the lifecycle policy keeps the image each one names.
 - Scan on push and AES256 encryption.
 - `force_delete = false`: a repository that still holds images cannot be
   destroyed by accident.
@@ -48,13 +50,13 @@ creates the repository and the instance in one call.
 | Name | Version |
 | ---- | ------- |
 | terraform | >= 1.11 |
-| aws | ~> 6.0 |
+| aws | >= 6.8, < 7.0 |
 
 ## Providers
 
 | Name | Version |
 | ---- | ------- |
-| aws | ~> 6.0 |
+| aws | >= 6.8, < 7.0 |
 
 ## Modules
 
@@ -75,6 +77,7 @@ No modules.
 | component | Value of the `Component` tag on the repository. | `string` | `"ecr-repository"` | no |
 | expire\_untagged\_after\_days | Untagged images (for example layers left behind by a failed push) expire this many days after being pushed. | `number` | `7` | no |
 | keep\_release\_images | How many images tagged with one of `release_tag_prefixes` to keep. Older ones expire. | `number` | `20` | no |
+| mutable\_tags | Tags that may move from image to image, such as `current` for the build that is live. Every other tag stays immutable, and the lifecycle never expires the image a mutable tag names. | `list(string)` | `[]` | no |
 | release\_tag\_prefixes | Tag prefixes that identify release images, which `keep_release_images` applies to. Defaults to `v`, for tags like `v1.2.3`. | `list(string)` | <pre>[<br/>  "v"<br/>]</pre> | no |
 
 ## Outputs

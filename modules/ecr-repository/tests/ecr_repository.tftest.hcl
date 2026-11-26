@@ -128,3 +128,82 @@ run "rejects_zero_keep" {
 
   expect_failures = [var.keep_release_images]
 }
+
+run "a_mutable_tag_moves_and_its_image_is_kept" {
+  command = plan
+
+  variables {
+    mutable_tags         = ["current"]
+    release_tag_prefixes = ["sha-"]
+    keep_release_images  = 10
+  }
+
+  assert {
+    condition     = aws_ecr_repository.this.image_tag_mutability == "IMMUTABLE_WITH_EXCLUSION"
+    error_message = "a mutable tag needs IMMUTABLE_WITH_EXCLUSION so every other tag stays immutable"
+  }
+
+  assert {
+    condition = (
+      length(aws_ecr_repository.this.image_tag_mutability_exclusion_filter) == 1 &&
+      [for f in aws_ecr_repository.this.image_tag_mutability_exclusion_filter : f.filter] == ["current"] &&
+      [for f in aws_ecr_repository.this.image_tag_mutability_exclusion_filter : f.filter_type] == ["WILDCARD"]
+    )
+    error_message = "exactly one exclusion filter, `current`, must exempt the mutable tag"
+  }
+
+  assert {
+    condition = [
+      for r in jsondecode(aws_ecr_lifecycle_policy.this.policy).rules : [r.rulePriority, r.selection]
+      ] == [
+      [1, { tagStatus = "tagged", tagPatternList = ["current"], countType = "imageCountMoreThan", countNumber = 1 }],
+      [2, { tagStatus = "untagged", countType = "sinceImagePushed", countUnit = "days", countNumber = 7 }],
+      [3, { tagStatus = "tagged", tagPrefixList = ["sha-"], countType = "imageCountMoreThan", countNumber = 10 }],
+    ]
+    error_message = "the policy must keep the `current` image first, then expire untagged, then keep the newest 10 sha- builds"
+  }
+
+  assert {
+    condition     = jsondecode(aws_ecr_lifecycle_policy.this.policy).rules[0].description == "Keep the image tagged current"
+    error_message = "the keep rule must say which tag it keeps"
+  }
+}
+
+run "no_mutable_tags_keeps_the_policy_of_0_1_4" {
+  command = plan
+
+  assert {
+    condition     = aws_ecr_repository.this.image_tag_mutability == "IMMUTABLE"
+    error_message = "without mutable tags every tag stays immutable"
+  }
+
+  assert {
+    condition     = length(aws_ecr_repository.this.image_tag_mutability_exclusion_filter) == 0
+    error_message = "without mutable tags there is no exclusion filter"
+  }
+
+  assert {
+    condition     = length(jsondecode(aws_ecr_lifecycle_policy.this.policy).rules) == 2
+    error_message = "without mutable tags the policy has exactly its two rules"
+  }
+}
+
+run "rejects_a_mutable_tag_that_is_a_release_tag" {
+  command = plan
+
+  variables {
+    mutable_tags = ["v-latest"]
+  }
+
+  expect_failures = [var.mutable_tags]
+}
+
+run "rejects_a_wildcard_mutable_tag" {
+  command = plan
+
+  variables {
+    mutable_tags = ["cur*"]
+  }
+
+  expect_failures = [var.mutable_tags]
+}
