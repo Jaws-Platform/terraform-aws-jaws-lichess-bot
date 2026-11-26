@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.0](https://github.com/Jaws-Platform/terraform-aws-jaws-lichess-bot/compare/v0.1.4...v0.2.0) (2026-11-26)
+
+
+### Features
+
+* **ecr-repository:** let named tags move, and keep the image each one names ([#18](https://github.com/Jaws-Platform/terraform-aws-jaws-lichess-bot/issues/18)) ([e101eec](https://github.com/Jaws-Platform/terraform-aws-jaws-lichess-bot/commit/e101eecd54a5cb727cc6b270f17fad82aa1f2ae2))
+
 ## [0.1.4](https://github.com/Jaws-Platform/terraform-aws-jaws-lichess-bot/compare/v0.1.3...v0.1.4) (2026-11-22)
 
 
