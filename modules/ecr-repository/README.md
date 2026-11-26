@@ -30,7 +30,7 @@ CI role create the repository itself.
 ```hcl
 module "image" {
   source  = "Jaws-Platform/jaws-lichess-bot/aws//modules/ecr-repository"
-  version = "0.1.4" # x-release-please-version
+  version = "0.2.0" # x-release-please-version
 
   name                       = "acme-chess-engine"
   keep_release_images        = 20
